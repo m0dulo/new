@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <title>Better Patter Meter</title>
+  </head>
+  <body>
+    <h1>Press Z or X</h1>
+    <canvas id='bpm-canvas'></canvas>
+    <script src='bpm.js'></script>
+    <!-- <script src='bpm.min.js'></script> -->
+    <script>
+      var meter = bpm('bpm-canvas');
+      window.addEventListener('keydown', function (e) {
+        if (e.keyCode === 90 || e.keyCode === 88) meter.pat();
+        else if (e.keyCode === 8) meter.undo();
+        else if (e.keyCode === 13) meter.finish();
+        else if (e.keyCode === 32) meter.break();
+      });
+      document.getElementById('bpm-canvas').addEventListener('mousedown', function (e) {
+        meter.pat();
+        // Let BPM do the rest of the things
+      });
+    </script>
+  </body>
+</html>

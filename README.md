@@ -1,55 +1,70 @@
-# cuddly-telegram-newyear2016
+# Better Patter Meter
+又一个（大概会更准确的）乐曲速度检测，基于 HTML/JavaScript  
+Yet another probably-more-precise music tempo analysis based on HTML/JavaScript  
+さらにもう一つのテンポアナライザ、おそらくより正確になります。HTML/JavaScript に基づきます
 
-HSEFZ 2016元旦文艺汇演弹幕屏
+## :heavy_check_mark: Alpha version released
 
-由于服务端未设置 `Access-Control-Allow-Origin` 的 HTTP 头，调试/运行时需要使用扩展暂时绕过浏览器同源策略的控制  
-Firefox：[cors everywhere](https://addons.mozilla.org/zh-CN/firefox/addon/cors-everywhere/)  
-Chrome：[Access-Control-Allow-Origin: *](https://chrome.google.com/webstore/detail/allow-control-allow-origi/nlfbmbojpeacfghkpbjhddihlkkiljbi)
+啊啊啊不要在意这混乱的代码(/\_<) 有空一定会整理的！(/\_<)
 
-↓ Unicode 字符测试 √
+## 算法
 
-![Screenshot](screenshot.png)
+咦这里有一篇大大们的论文qwq
 
-主程序 `index.html`
-===================
+[田 垅,刘宗田.最小二乘法分段直线拟合\[J\].计算机科学,2012,39(Z6):482-484](http://www.jsjkx.com/jsjkx/ch/reader/view_abstract.aspx?file_no=12006128&flag=1)
 
-为防止服务器发抽，连续收到两条文字内容相同的消息时会忽略
+~~（话说泥萌给了个算法都不分析复杂度啊啊啊啊啊~~
 
-弹幕后台 `sender.html`
-=====================
+然后窝们发现可以还可以改进。。用 DP 解决全局最小值。。。嗯
 
-Firefox / Chrome / Safari 均工作正常，但同样存在同源策略问题……
+### 动态规划
 
-Position 可以选择 top、bottom 或者 top-stick（Admin 专用）
+假设窝们收到了 _n_ 次拍击。
 
-两个按钮分别为“发送”和“随机选取一个颜色并发送”，在 Web Console 里可以看到所有发送的 HTTP 请求
+用 `est[i, j]` 和 `err[i, j]` 分别表示 `i .. j` 号点的 SLR 斜率值和误差值（取 1 - PCC<sup>6</sup>）。  
+用 `f[i, k]` 表示 `0 .. i` 号点分成 `k` 段的最小代价（误差值总和）。
 
-审核程序 `monitor.html`
-=======================
+那末有边界条件：`f[-1, 0] = 0`（还好 JavaScript 支持负下标ww）
 
-只是一个不能用的原型，并非本次汇演最终使用的版本
+然后使用 push 类型的状态转移方程：  
+`f[i, k] + err[i + 1, j] --min-→ f[j, k + 1]`  
+对于每个 `i, k`，枚举 `j = i + 8 .. N - 1` 转移即可（+8 是为了防止各种乱入的小段）
 
-点击一条弹幕进行删除，按下空格键可以暂停，其余同上…………
+最后对每一个 `k`，~~对 `f[n - 1, k]` 进行一下估价 `Eval(k, f[n - 1, k])` 然后取最优值就可以啦～~~  
+其实只要取 `f[n - 1, k]` 的最小值就可以了…  
+状态转移的时候记录下前驱就可以方便地得到转移路线从而获得具体分段方案～
 
-无聊的 `index-check.html`
-=========================
+时间复杂度 _O_(_n_<sup>2</sup> · _k_<sub>max</sub>)
 
-并不会显示弹幕，所有接收到的弹幕信息会全部进入 Web Console。
+### 普通地优化一下
 
-lsq 通过这里观察到了同一条弹幕刷屏的规律（似乎是服务器的 bug）并修复。
+窝们发现前面拍击的时候程序一直闲着没事做 = =  
+让它一边接受拍击一边算 DP 吧！
 
-TODO
-====
+普通地瞄了一眼之后发现转移方程可以改成 pull：  
+`f[i, k] = min[0 <= j < i - 8] { f[j, k - 1] + err[j + 1, i] }`
 
-* ~~测试文字阴影与导播机/大屏幕的综合效果并进行调整（于 2015/12/29 下午进行）~~（完成，效果拔群）
-* ~~使用浅一点的蓝色（`#00f` 在大屏幕上效果不佳）~~（完成）
+然后窝们就可以愉快地在第 _i_ 次拍击之后算出 `f[i, *]` 的值啦～单次拍击处理过程时间复杂度 _O_(_n_ · _k_<sub>max</sub>)
 
-名称来源
-========
+实现的时候为避免段间衔接时出现奇怪的误差，计算所有 `err` 的时候都截去了头尾各两个记录点
 
-GitHub 创建新项目时的自动提示
+### 线性回归
 
-许可证
-======
+`est` 和 `err` 的值怎么办捏？  
+显然也可以在拍击的同时计算嘛。用数组存存就好了。
 
-[The MIT/Expat License](LICENSE)
+单次拍击需要计算 _O_(_n_) 次线性回归，每次的时间复杂度都是 _O_(_n_)  
+**单次**时间复杂度 **_O_(_n_<sup>2</sup>)**，总空间复杂度 _O_(_n_<sup>2</sup>)  
+于是乎敲了大概几百下之后就会卡得不行。。内存也会爆炸。。。
+
+呃。。其实由于这里线性回归的 _x_ 值就是 0 ~ _n_-1，所以平均值啊什么 Σ_x_<sub>_i_</sub>_y_<sub>_i_</sub> 啊都是可以用前缀和计算的。。。  
+普通地往普通的 SLR 里面塞了好几种前缀和之后发现斜率和 PCC 值都可以在 **_O_(1)** 时间内算出来了。。而且这样一来也不用 _O_(_n_<sup>2</sup>) 的数组存了。。  
+（一股黑科技的气息迎面袭来）
+
+然后发现还可以在第 _i_ 次拍击的同时就算出所有 `est[j, i]` 和 `err[j, i]`，时间复杂度 _O_(_n_)  
+嘛然后就愉快地解决啦
+
+最终渐进时间复杂度 _O_(_n_<sup>2</sup> · _k_<sub>max</sub>)，但是单次拍击的处理时间为 _O_(_n_ · _k_<sub>max</sub>)。  
+空间复杂度 _O_(_n_ · _k_<sub>max</sub>)。  
+具体实现中取 _k_<sub>max</sub>=10。（窝不觉得会有某首曲子有10段以上不同速度的段 > <）  
+可以顺利处理大约 50,000 次拍击的规模。（无聊的人(tes-)类(ter)们啊这么多够不。。）
